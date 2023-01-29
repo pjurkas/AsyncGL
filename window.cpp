@@ -5,34 +5,17 @@
 #include <GL/gl.h>
 #include <GL/glu.h>
 
-#define WIDTH  2000
-#define HEIGHT 1000
-#define SIZE   (3 * WIDTH * HEIGHT)
-
 namespace asyncgl
 {
-    Window::Window(QWindow *parent)
-        : QWindow(parent)
+    Window::Window(std::vector<QImage>&& images)
+        : QWindow()
         , m_thread(this)
         , m_context(nullptr)
         , m_index(0)
+        , m_images(images)
     {
         setSurfaceType(QWindow::OpenGLSurface);
         installEventFilter(this);
-
-        for (int i = 0; i < 3; ++i)
-        {
-            m_frames[i].resize(SIZE);
-            for (int y = 0; y < HEIGHT; ++y)
-            {
-                auto value = int(255.0 * y / HEIGHT);
-                for (int x = 0; x < WIDTH; ++x)
-                {
-                    auto p = &m_frames[i][3 * (x + y * WIDTH)];
-                    p[i] = value;
-                }
-            }
-        }
     }
 
     void Window::initialize()
@@ -56,6 +39,11 @@ namespace asyncgl
         glBindTexture(GL_TEXTURE_2D, 0);
 
         glGenBuffers(1, &m_pbo);
+
+        // glBindBuffer(GL_PIXEL_UNPACK_BUFFER, m_pbo);
+        // auto& image = m_images[0];
+        // upload(image.bits(), 3 * image.width() * image.height());
+        // glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
     }
 
     void Window::render()
@@ -75,33 +63,39 @@ namespace asyncgl
         glViewport(0, 0, width(), height());
 
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, m_pbo);
-        glBufferData(GL_PIXEL_UNPACK_BUFFER, SIZE, 0, GL_STREAM_DRAW);
 
-        void* mappedBuffer = glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
-        memcpy(mappedBuffer, &m_frames[m_index][0], SIZE);
+        auto& image = m_images[m_index];
+
+        upload(image.bits(), 3 * image.width() * image.height());
 
         glBindTexture(GL_TEXTURE_2D, m_texture);
 
-        glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
-
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, WIDTH, HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.width(), image.height(), 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
 
         glEnable(GL_TEXTURE_2D);
 
         glBegin(GL_QUADS);
-        glTexCoord2f(0.0, 0.0); glVertex2f(-1, -1);
-        glTexCoord2f(1.0, 0.0); glVertex2f(+1, -1);
-        glTexCoord2f(1.0, 1.0); glVertex2f(+1, +1);
-        glTexCoord2f(0.0, 1.0); glVertex2f(-1, +1);
+        glTexCoord2f(0.0, 1.0); glVertex2f(-1, -1);
+        glTexCoord2f(1.0, 1.0); glVertex2f(+1, -1);
+        glTexCoord2f(1.0, 0.0); glVertex2f(+1, +1);
+        glTexCoord2f(0.0, 0.0); glVertex2f(-1, +1);
         glEnd();
 
         glDisable(GL_TEXTURE_2D);
-        
+
         glBindTexture(GL_TEXTURE_2D, 0);
 
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
-        m_index = (m_index + 1) % 3;
+        m_index = (m_index + 1) % m_images.size();
+    }
+
+    void Window::upload(void *data, size_t size)
+    {
+        glBufferData(GL_PIXEL_UNPACK_BUFFER, size, 0, GL_STREAM_DRAW);
+        void* mappedBuffer = glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
+        memcpy(mappedBuffer, data, size);
+        glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
     }
 
     bool Window::eventFilter(QObject *obj, QEvent *event)

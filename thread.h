@@ -14,10 +14,12 @@ namespace asyncgl
 
         explicit Thread(Window *parent = 0);
 
-        void run() override;
-
         void start();
         void stop();
+
+    protected:
+
+        void run() override;
 
     private:
 

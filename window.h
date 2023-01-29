@@ -9,13 +9,27 @@
 
 namespace asyncgl
 {
+    struct Frame
+    {
+        inline Frame(size_t w, size_t h)
+            : width(w)
+            , height(h)
+        {
+            data.resize(3 * w * h);
+        }
+
+        size_t width;
+        size_t height;
+        std::vector<unsigned char> data;
+    };
+
     class Window : public QWindow, protected QOpenGLFunctions
     {
         Q_OBJECT
 
     public:
 
-        explicit Window(QWindow *parent = nullptr);
+        explicit Window(std::vector<QImage>&& images);
 
         void initialize();
         void render();
@@ -23,6 +37,7 @@ namespace asyncgl
 
     protected:
 
+        void upload(void *data, size_t size);
         bool eventFilter(QObject *obj, QEvent *event);
 
     private:
@@ -35,6 +50,6 @@ namespace asyncgl
 
         int m_index;
 
-        std::vector<unsigned char> m_frames[3];
+        std::vector<QImage> m_images;
     };
 }
